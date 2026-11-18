@@ -6,7 +6,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 Gio._promisify(Shell.Screenshot.prototype, 'screenshot');
-const OUT = GLib.getenv('TB_SHOT_DIR');
+const OUT = GLib.getenv('HR_SHOT_DIR');
 const wait = ms => new Promise(r => GLib.timeout_add(0, ms, () => { r(); return GLib.SOURCE_REMOVE; }));
 
 async function shot(name) {
@@ -22,15 +22,15 @@ export default class extends Extension {
                 await wait(12000);
                 Main.overview.hide();
                 await wait(800);
-                const tb = Main.panel.statusArea['token-bar@jasperblues.github.io'];
-                console.log(`TBSHOT indicator=${!!tb}`);
+                const tb = Main.panel.statusArea['headroom@jasperblues.github.io'];
+                console.log(`HRSHOT indicator=${!!tb}`);
                 await shot('panel');
                 tb?.menu.open();
                 await wait(1500);
                 await shot('menu');
-                console.log('TBSHOT done');
+                console.log('HRSHOT done');
             } catch (e) {
-                console.error('TBSHOT', e);
+                console.error('HRSHOT', e);
             }
         })();
     }

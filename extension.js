@@ -1,4 +1,4 @@
-// Token Bar: AI plan limits (CodexBar CLI) + today's token burn (ccusage) in the GNOME top bar.
+// Headroom: AI plan limits (CodexBar CLI) + today's token burn (ccusage) in the GNOME top bar.
 import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
@@ -104,14 +104,14 @@ function label(text, styleClass, props = {}) {
 function row(left, right, leftClass, rightClass) {
     const box = new St.BoxLayout({x_expand: true});
     box.add_child(label(left, leftClass, {x_expand: true, y_align: Clutter.ActorAlign.CENTER}));
-    box.add_child(label(right, rightClass ?? 'token-bar-row-value', {y_align: Clutter.ActorAlign.CENTER}));
+    box.add_child(label(right, rightClass ?? 'headroom-row-value', {y_align: Clutter.ActorAlign.CENTER}));
     return box;
 }
 
 function bar(usedPercent) {
     const left = 100 - usedPercent;
-    const track = new St.Widget({style_class: 'token-bar-track', style: `width: ${TRACK_PX}px;`});
-    const fill = new St.Widget({style_class: 'token-bar-fill'});
+    const track = new St.Widget({style_class: 'headroom-track', style: `width: ${TRACK_PX}px;`});
+    const fill = new St.Widget({style_class: 'headroom-fill'});
     const sev = severity(left);
     if (sev)
         fill.add_style_class_name(sev);
@@ -126,7 +126,7 @@ class Card extends PopupMenu.PopupBaseMenuItem {
     _init() {
         // Stay reactive so St doesn't apply :insensitive (dimmed) styling, but never hover or activate.
         super._init({reactive: true, activate: false, hover: false, can_focus: false});
-        this.box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'token-bar-card', x_expand: true});
+        this.box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'headroom-card', x_expand: true});
         this.add_child(this.box);
     }
 
@@ -143,10 +143,10 @@ class Card extends PopupMenu.PopupBaseMenuItem {
     }
 });
 
-const TokenBar = GObject.registerClass(
-class TokenBar extends PanelMenu.Button {
+const Headroom = GObject.registerClass(
+class Headroom extends PanelMenu.Button {
     _init(ext) {
-        super._init(0.5, 'Token Bar');
+        super._init(0.5, 'Headroom');
         this._ext = ext;
         this._cancellable = new Gio.Cancellable();
         this._limits = null;
@@ -156,12 +156,12 @@ class TokenBar extends PanelMenu.Button {
         this._limitsAt = 0;
         this._tokensAt = 0;
 
-        const box = new St.BoxLayout({style_class: 'panel-status-menu-box token-bar-panel-box'});
+        const box = new St.BoxLayout({style_class: 'panel-status-menu-box headroom-panel-box'});
         this._icon = new St.Icon({
             gicon: Gio.icon_new_for_string(`${ext.path}/icons/brain-symbolic.svg`),
-            style_class: 'system-status-icon token-bar-icon',
+            style_class: 'system-status-icon headroom-icon',
         });
-        this._label = label('…', 'token-bar-panel-label', {y_align: Clutter.ActorAlign.CENTER});
+        this._label = label('…', 'headroom-panel-label', {y_align: Clutter.ActorAlign.CENTER});
         box.add_child(this._icon);
         box.add_child(this._label);
         this.add_child(box);
@@ -277,12 +277,12 @@ class TokenBar extends PanelMenu.Button {
     _renderLimits() {
         if (!this._limits) {
             this._limitsCard.reset(
-                label('Plan limits', 'token-bar-heading'),
-                label(this._limitsError ?? 'Loading…', 'token-bar-dim'));
+                label('Plan limits', 'headroom-heading'),
+                label(this._limitsError ?? 'Loading…', 'headroom-dim'));
             return;
         }
         const u = this._limits.usage;
-        const children = [row('Claude', u.loginMethod ?? '', 'token-bar-heading', 'token-bar-dim')];
+        const children = [row('Claude', u.loginMethod ?? '', 'headroom-heading', 'headroom-dim')];
         for (const w of this._windows()) {
             const used = w.window.usedPercent ?? 0;
             children.push(row(w.title, `${100 - Math.round(used)}% left`));
@@ -290,37 +290,37 @@ class TokenBar extends PanelMenu.Button {
             const detail = [until(w.window.resetsAt) && `Resets in ${until(w.window.resetsAt)}`, w.pace]
                 .filter(Boolean).join(' · ');
             if (detail)
-                children.push(label(detail, 'token-bar-dim'));
+                children.push(label(detail, 'headroom-dim'));
         }
         if (this._limitsError)
-            children.push(label(`⚠ ${this._limitsError}`, 'token-bar-dim'));
+            children.push(label(`⚠ ${this._limitsError}`, 'headroom-dim'));
         this._limitsCard.reset(...children);
     }
 
     _renderTokens(today) {
         if (!this._tokens) {
             this._tokensCard.reset(
-                label('Today', 'token-bar-heading'),
-                label(this._tokensError ?? 'Loading…', 'token-bar-dim'));
+                label('Today', 'headroom-heading'),
+                label(this._tokensError ?? 'Loading…', 'headroom-dim'));
             return;
         }
         const days = this._tokens;
         const todayTokens = today?.totalTokens ?? 0;
-        const header = row('Today', '', 'token-bar-heading', 'token-bar-dim');
+        const header = row('Today', '', 'headroom-heading', 'headroom-dim');
         if (today)
             header.get_last_child().clutter_text.set_markup(`<b>${money(today.totalCost)}</b> API-equivalent`);
         const children = [header];
-        children.push(label(`${compact(todayTokens)} tokens`, 'token-bar-big'));
+        children.push(label(`${compact(todayTokens)} tokens`, 'headroom-big'));
 
         if (today) {
             children.push(label(
                 `out ${compact(today.outputTokens)} · in ${compact(today.inputTokens)} · ` +
                 `cache read ${compact(today.cacheReadTokens)} · write ${compact(today.cacheCreationTokens)}`,
-                'token-bar-dim'));
+                'headroom-dim'));
             const models = [...(today.modelBreakdowns ?? [])].sort((a, b) => b.cost - a.cost);
             for (const m of models) {
                 const total = m.inputTokens + m.outputTokens + m.cacheReadTokens + m.cacheCreationTokens;
-                children.push(row(shortModel(m.modelName), `${compact(total)} · ${money(m.cost)}`, 'token-bar-dim', 'token-bar-dim'));
+                children.push(row(shortModel(m.modelName), `${compact(total)} · ${money(m.cost)}`, 'headroom-dim', 'headroom-dim'));
             }
         }
 
@@ -342,14 +342,14 @@ class TokenBar extends PanelMenu.Button {
         }).join('');
         const weekTotal = week.reduce((a, b) => a + b, 0);
         const sparkRow = new St.BoxLayout({x_expand: true});
-        sparkRow.add_child(label('Last 7 days', 'token-bar-dim', {x_expand: true, y_align: Clutter.ActorAlign.CENTER}));
-        const sparkLabel = label(spark, 'token-bar-spark', {y_align: Clutter.ActorAlign.CENTER});
+        sparkRow.add_child(label('Last 7 days', 'headroom-dim', {x_expand: true, y_align: Clutter.ActorAlign.CENTER}));
+        const sparkLabel = label(spark, 'headroom-spark', {y_align: Clutter.ActorAlign.CENTER});
         sparkLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         // Leading zero-width space: Clutter otherwise lets the CSS colour win over the first span.
         sparkLabel.clutter_text.set_markup(`\u200b${spark}`);
         sparkRow.add_child(sparkLabel);
         children.push(sparkRow);
-        children.push(row(`${compact(weekTotal)} this week`, `avg ${compact(weekTotal / 7)}/day`, 'token-bar-dim', 'token-bar-dim'));
+        children.push(row(`${compact(weekTotal)} this week`, `avg ${compact(weekTotal / 7)}/day`, 'headroom-dim', 'headroom-dim'));
 
         // Personal best (excluding today), for the tokenmaxers.
         const past = days.filter(d => d.period !== today?.period);
@@ -357,14 +357,14 @@ class TokenBar extends PanelMenu.Button {
         if (best) {
             const when = GLib.DateTime.new_from_iso8601(`${best.period}T12:00:00Z`, null)?.format('%-d %b') ?? best.period;
             if (todayTokens > best.totalTokens) {
-                children.push(label(`🏆 New record. Previous best ${compact(best.totalTokens)} on ${when}`, 'token-bar-record'));
+                children.push(label(`🏆 New record. Previous best ${compact(best.totalTokens)} on ${when}`, 'headroom-record'));
             } else {
                 const pct = Math.round((todayTokens / best.totalTokens) * 100);
-                children.push(row(`Best: ${compact(best.totalTokens)} on ${when}`, `today ${pct}% of PB`, 'token-bar-dim', 'token-bar-dim'));
+                children.push(row(`Best: ${compact(best.totalTokens)} on ${when}`, `today ${pct}% of PB`, 'headroom-dim', 'headroom-dim'));
             }
         }
         if (this._tokensError)
-            children.push(label(`⚠ ${this._tokensError}`, 'token-bar-dim'));
+            children.push(label(`⚠ ${this._tokensError}`, 'headroom-dim'));
         this._tokensCard.reset(...children);
     }
 
@@ -380,9 +380,9 @@ class TokenBar extends PanelMenu.Button {
     }
 });
 
-export default class TokenBarExtension extends Extension {
+export default class HeadroomExtension extends Extension {
     enable() {
-        this._indicator = new TokenBar(this);
+        this._indicator = new Headroom(this);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
     }
 
