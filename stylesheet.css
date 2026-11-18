@@ -1,0 +1,57 @@
+.token-bar-panel-label {
+  font-feature-settings: "tnum";
+}
+
+.token-bar-panel-label.warn { color: #f5c211; }
+.token-bar-panel-label.crit { color: #ed333b; }
+
+.token-bar-card {
+  spacing: 4px;
+  min-width: 300px;
+  padding: 2px 4px;
+}
+
+.token-bar-heading {
+  font-weight: bold;
+}
+
+.token-bar-dim {
+  font-size: 0.85em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.token-bar-big {
+  font-size: 1.6em;
+  font-weight: 800;
+  font-feature-settings: "tnum";
+}
+
+.token-bar-row-value {
+  font-feature-settings: "tnum";
+}
+
+.token-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.token-bar-fill {
+  height: 6px;
+  border-radius: 3px;
+  background-color: #62a0ea;
+}
+
+.token-bar-fill.warn { background-color: #f5c211; }
+.token-bar-fill.crit { background-color: #ed333b; }
+
+.token-bar-spark {
+  font-size: 1.3em;
+  color: #62a0ea;
+  letter-spacing: 1px;
+}
+
+.token-bar-record {
+  color: #f5c211;
+  font-weight: bold;
+}

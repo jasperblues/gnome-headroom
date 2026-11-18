@@ -1,0 +1,7 @@
+{
+  "uuid": "token-bar@jasperblues.github.io",
+  "name": "Token Bar",
+  "description": "AI plan limits (via the CodexBar CLI) and today's token burn (via ccusage) in the top bar.",
+  "shell-version": ["50", "51"],
+  "url": "https://github.com/jasperblues/gnome-token-bar"
+}
