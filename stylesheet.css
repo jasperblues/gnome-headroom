@@ -55,3 +55,12 @@
   color: #f5c211;
   font-weight: bold;
 }
+
+#panel .panel-button .token-bar-panel-box {
+  spacing: 6px;
+}
+
+#panel .panel-button .token-bar-icon {
+  padding: 0;
+  margin: 0;
+}

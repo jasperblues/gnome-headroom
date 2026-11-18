@@ -15,7 +15,6 @@ Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async');
 
 const HOME = GLib.get_home_dir();
 const CODEXBAR = `${HOME}/.local/bin/codexbar`;
-const CODEXBAR_APP = `${HOME}/.local/bin/codexbar-linux`;
 const PROVIDER = 'claude';
 // ccusage is usually an nvm-managed global, which GNOME Shell's PATH doesn't see.
 const CCUSAGE_ARGV = ['/bin/bash', '-c',
@@ -84,6 +83,20 @@ function severity(leftPercent) {
     return null;
 }
 
+// Cool → hot: blue, purple, orange, red as a day approaches your all-time best.
+const HEAT_STOPS = [[0, [0x62, 0xa0, 0xea]], [0.45, [0xc0, 0x61, 0xcb]], [0.75, [0xff, 0x78, 0x00]], [1, [0xed, 0x33, 0x3b]]];
+
+function heat(fraction) {
+    const f = Math.max(0, Math.min(1, fraction));
+    let i = 1;
+    while (i < HEAT_STOPS.length - 1 && f > HEAT_STOPS[i][0])
+        i++;
+    const [p0, c0] = HEAT_STOPS[i - 1];
+    const [p1, c1] = HEAT_STOPS[i];
+    const t = (f - p0) / (p1 - p0);
+    return `#${c0.map((c, k) => Math.round(c + (c1[k] - c) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
 function label(text, styleClass, props = {}) {
     return new St.Label({text, style_class: styleClass ?? '', ...props});
 }
@@ -143,8 +156,15 @@ class TokenBar extends PanelMenu.Button {
         this._limitsAt = 0;
         this._tokensAt = 0;
 
+        const box = new St.BoxLayout({style_class: 'panel-status-menu-box token-bar-panel-box'});
+        this._icon = new St.Icon({
+            gicon: Gio.icon_new_for_string(`${ext.path}/icons/brain-symbolic.svg`),
+            style_class: 'system-status-icon token-bar-icon',
+        });
         this._label = label('…', 'token-bar-panel-label', {y_align: Clutter.ActorAlign.CENTER});
-        this.add_child(this._label);
+        box.add_child(this._icon);
+        box.add_child(this._label);
+        this.add_child(box);
 
         this._limitsCard = new Card();
         this._tokensCard = new Card();
@@ -153,13 +173,6 @@ class TokenBar extends PanelMenu.Button {
         this.menu.addMenuItem(this._tokensCard);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('Refresh', () => this._refresh(true));
-        this.menu.addAction('Open CodexBar', () => {
-            try {
-                Gio.Subprocess.new([CODEXBAR_APP, '--usage'], Gio.SubprocessFlags.NONE);
-            } catch (e) {
-                Main.notifyError('Token Bar', `Couldn't start CodexBar: ${e.message}`);
-            }
-        });
 
         this.menu.connect('open-state-changed', (_m, open) => {
             if (open)
@@ -293,7 +306,10 @@ class TokenBar extends PanelMenu.Button {
         }
         const days = this._tokens;
         const todayTokens = today?.totalTokens ?? 0;
-        const children = [row('Today', today ? `${money(today.totalCost)} API-equivalent` : '', 'token-bar-heading', 'token-bar-dim')];
+        const header = row('Today', '', 'token-bar-heading', 'token-bar-dim');
+        if (today)
+            header.get_last_child().clutter_text.set_markup(`<b>${money(today.totalCost)}</b> API-equivalent`);
+        const children = [header];
         children.push(label(`${compact(todayTokens)} tokens`, 'token-bar-big'));
 
         if (today) {
@@ -317,12 +333,20 @@ class TokenBar extends PanelMenu.Button {
             week.push(byDate.get(localDate(d)) ?? 0);
         }
         const peak = Math.max(...week, 1);
-        const spark = week.map(v => (v === 0 ? ' ' : SPARKS[Math.min(7, Math.floor((v / peak) * 7.999))])).join('');
+        const record = Math.max(...days.map(d => d.totalTokens), 1);
+        const spark = week.map(v => {
+            if (v === 0)
+                return ' ';
+            const glyph = SPARKS[Math.min(7, Math.floor((v / peak) * 7.999))];
+            return `<span foreground="${heat(v / record)}">${glyph}</span>`;
+        }).join('');
         const weekTotal = week.reduce((a, b) => a + b, 0);
         const sparkRow = new St.BoxLayout({x_expand: true});
         sparkRow.add_child(label('Last 7 days', 'token-bar-dim', {x_expand: true, y_align: Clutter.ActorAlign.CENTER}));
         const sparkLabel = label(spark, 'token-bar-spark', {y_align: Clutter.ActorAlign.CENTER});
         sparkLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        // Leading zero-width space: Clutter otherwise lets the CSS colour win over the first span.
+        sparkLabel.clutter_text.set_markup(`\u200b${spark}`);
         sparkRow.add_child(sparkLabel);
         children.push(sparkRow);
         children.push(row(`${compact(weekTotal)} this week`, `avg ${compact(weekTotal / 7)}/day`, 'token-bar-dim', 'token-bar-dim'));
