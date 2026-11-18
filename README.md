@@ -91,6 +91,11 @@ tools/nested-shot.sh          # your real data
 tools/nested-shot.sh --demo   # fake data from tools/demo/ (used for the README screenshot)
 ```
 
+## See also
+
+- [Roomy Panel](https://github.com/jasperblues/gnome-roomy-panel): macOS-style spacing in the top bar.
+- [Polite Focus](https://github.com/jasperblues/gnome-polite-focus): macOS-style focus for windows that ask for attention, with a mute list.
+
 ## Credits
 
 The plan-limit data comes from [CodexBar](https://github.com/steipete/CodexBar) by Peter Steinberger, which does the hard work of talking to over a hundred providers. The token data comes from [ccusage](https://github.com/ryoppippi/ccusage) by ryoppippi.
