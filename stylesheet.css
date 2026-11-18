@@ -4,6 +4,25 @@
 
 .headroom-panel-label.warn { color: #f5c211; }
 .headroom-panel-label.crit { color: #ed333b; }
+.headroom-icon.warn { color: #f5c211; }
+.headroom-icon.crit { color: #ed333b; }
+
+/* Battery-style meter beside the brain: track is the full plan window, fill is what's left. */
+.headroom-meter {
+  width: 3px;
+  height: 14px;
+  border-radius: 1.5px;
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.headroom-meter-fill {
+  width: 3px;
+  border-radius: 1.5px;
+  background-color: #ffffff;
+}
+
+.headroom-meter-fill.warn { background-color: #f5c211; }
+.headroom-meter-fill.crit { background-color: #ed333b; }
 
 .headroom-card {
   spacing: 4px;
@@ -57,7 +76,7 @@
 }
 
 #panel .panel-button .headroom-panel-box {
-  spacing: 6px;
+  spacing: 4px;
 }
 
 #panel .panel-button .headroom-icon {

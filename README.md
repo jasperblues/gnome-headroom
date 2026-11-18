@@ -6,7 +6,7 @@ A GNOME Shell extension that shows how much of your AI plan you have left, right
 
 ## What it shows
 
-**In the top bar:** a brain icon, the percentage left in whichever plan window is closest to running out, and today's token count. The percentage turns yellow at 25% left and red at 10%.
+**In the top bar:** a brain icon with a thin meter beside it, like a battery gauge. The meter shows how much is left in whichever plan window is closest to running out. Both turn yellow at 25% left and red at 10%. Like the other status icons, it stays icon-only by default. If you want the numbers up there too, see `panel-style` under [Settings](#settings).
 
 **Plan limits** (from [CodexBar](https://github.com/steipete/CodexBar)):
 
@@ -63,6 +63,12 @@ schemas=~/.local/share/gnome-shell/extensions/headroom@jasperblues.github.io/sch
 
 # Which CodexBar provider's limits to show (default: claude). See `codexbar usage --help` for the full list.
 gsettings --schemadir $schemas set org.gnome.shell.extensions.headroom provider codex
+
+# What the top bar shows (default: icon)
+#   icon     brain + headroom meter
+#   percent  also the % left, e.g. "62%"
+#   full     also today's tokens, e.g. "62% · 615M"
+gsettings --schemadir $schemas set org.gnome.shell.extensions.headroom panel-style full
 
 # Where the tools are, if Headroom can't find them itself (default: auto-detect)
 gsettings --schemadir $schemas set org.gnome.shell.extensions.headroom codexbar-path /opt/codexbar/codexbar

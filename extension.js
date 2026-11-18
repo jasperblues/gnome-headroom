@@ -36,6 +36,7 @@ const LIMITS_EVERY_S = 300;
 const TOKENS_EVERY_S = 120;
 const STALE_ON_OPEN_S = 60;
 const TRACK_PX = 292;
+const METER_PX = 14;
 const SPARKS = '▁▂▃▄▅▆▇█';
 
 class ToolMissing extends Error {}
@@ -209,8 +210,14 @@ class Headroom extends PanelMenu.Button {
             gicon: Gio.icon_new_for_string(`${ext.path}/icons/brain-symbolic.svg`),
             style_class: 'system-status-icon headroom-icon',
         });
+        // Small vertical meter of headroom left, so the icon alone tells you how much is left.
+        this._meter = new St.Widget({style_class: 'headroom-meter', y_align: Clutter.ActorAlign.CENTER});
+        this._meterFill = new St.Widget({style_class: 'headroom-meter-fill', y_align: Clutter.ActorAlign.END});
+        this._meter.layout_manager = new Clutter.BinLayout();
+        this._meter.add_child(this._meterFill);
         this._label = label('…', 'headroom-panel-label', {y_align: Clutter.ActorAlign.CENTER});
         box.add_child(this._icon);
+        box.add_child(this._meter);
         box.add_child(this._label);
         this.add_child(box);
 
@@ -227,7 +234,11 @@ class Headroom extends PanelMenu.Button {
                 this._refresh(false, STALE_ON_OPEN_S);
         });
 
-        this._settings.connectObject('changed', () => {
+        this._settings.connectObject('changed', (_s, key) => {
+            if (key === 'panel-style') {
+                this._render();
+                return;
+            }
             this._limits = this._tokens = null;
             this._refresh(true);
         }, this);
@@ -318,23 +329,39 @@ class Headroom extends PanelMenu.Button {
     _render() {
         if (!this._label)
             return;
-        // Panel: tightest main window's % left, then today's tokens.
+        // Panel: brain + meter of the tightest main window's headroom; optionally % left and today's tokens.
         const main = this._windows().filter(w => !this._limits.usage.extraRateWindows?.some(x => x.window === w.window));
         const tightest = main.reduce((a, w) => (!a || w.window.usedPercent > a.window.usedPercent ? w : a), null);
         const today = this._today();
+        const style = this._settings.get_string('panel-style');
+        const left = tightest ? Math.max(0, Math.min(100, 100 - tightest.window.usedPercent)) : null;
+        const sev = left !== null ? severity(left) : null;
+        const failed = !tightest && !today && (this._limitsError || this._tokensError);
+
         const parts = [];
-        if (tightest)
-            parts.push(`${100 - Math.round(tightest.window.usedPercent)}%`);
-        if (today)
-            parts.push(compact(today.totalTokens));
-        else if (this._tokens)
-            parts.push('0');
-        this._label.text = parts.length ? parts.join(' · ') : (this._limitsError || this._tokensError ? '⚠' : '…');
-        this._label.remove_style_class_name('warn');
-        this._label.remove_style_class_name('crit');
-        const sev = tightest ? severity(100 - tightest.window.usedPercent) : null;
-        if (sev)
-            this._label.add_style_class_name(sev);
+        if (style !== 'icon' && tightest)
+            parts.push(`${Math.round(left)}%`);
+        if (style === 'full') {
+            if (today)
+                parts.push(compact(today.totalTokens));
+            else if (this._tokens)
+                parts.push('0');
+        }
+        // Text only when the style asks for it, or as a warning sign when both data sources failed.
+        this._label.text = parts.length ? parts.join(' · ') : failed ? '⚠' : style === 'icon' ? '' : '…';
+        this._label.visible = this._label.text !== '';
+
+        this._meter.visible = left !== null;
+        this._meterFill.set_style(`height: ${Math.max(1, Math.round(METER_PX * (left ?? 0) / 100))}px;`);
+        for (const actor of [this._label, this._icon, this._meterFill]) {
+            actor.remove_style_class_name('warn');
+            actor.remove_style_class_name('crit');
+            if (sev)
+                actor.add_style_class_name(sev);
+        }
+        const accessible = [tightest && `${Math.round(left)}% of ${tightest.title.toLowerCase()} limit left`,
+            today && `${compact(today.totalTokens)} tokens today`].filter(Boolean).join(', ');
+        this.accessible_name = accessible ? `Headroom: ${accessible}` : 'Headroom';
 
         this._renderLimits();
         this._renderTokens(today);
@@ -443,7 +470,7 @@ class Headroom extends PanelMenu.Button {
                 GLib.source_remove(id);
         }
         this._limitsTimer = this._tokensTimer = 0;
-        this._label = null;
+        this._label = this._meter = this._meterFill = null;
         super.destroy();
     }
 });
