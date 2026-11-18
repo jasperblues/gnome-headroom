@@ -31,5 +31,5 @@ INNER
 chmod +x "$tmp/inner.sh"
 env -u WAYLAND_DISPLAY -u DISPLAY XDG_DATA_HOME="$tmp/data" XDG_CONFIG_HOME="$tmp/config" \
     XDG_RUNTIME_DIR="$tmp/runtime" HR_SHOT_DIR="$out" dbus-run-session -- "$tmp/inner.sh" 2>/dev/null
-grep -E 'HRSHOT|JS ERROR|token-bar' "$out/shell.log" || true
+grep -E 'HRSHOT|JS ERROR|headroom' "$out/shell.log" || true
 ls "$out"/*.png
