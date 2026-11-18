@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Fake `codexbar usage --json` output for screenshots (tools/nested-shot.sh --demo)."""
+import datetime, json
+now = datetime.datetime.now(datetime.timezone.utc)
+iso = lambda d: (now + d).strftime('%Y-%m-%dT%H:%M:%SZ')
+print(json.dumps([{
+    "provider": "claude", "source": "oauth",
+    "rateWindowLabels": {"primary": "Session", "secondary": "Weekly"},
+    "pace": {"secondary": {"summary": "12% in reserve | Expected 50% used | Lasts until reset"}},
+    "usage": {
+        "loginMethod": "Claude Max",
+        "primary": {"usedPercent": 31, "resetsAt": iso(datetime.timedelta(hours=2, minutes=40)), "windowMinutes": 300},
+        "secondary": {"usedPercent": 38, "resetsAt": iso(datetime.timedelta(days=3, hours=6)), "windowMinutes": 10080},
+        "tertiary": None, "extraRateWindows": [],
+    },
+}]))

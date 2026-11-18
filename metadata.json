@@ -1,7 +1,12 @@
 {
   "uuid": "headroom@jasperblues.github.io",
   "name": "Headroom",
-  "description": "AI plan limits (via the CodexBar CLI) and today's token burn (via ccusage) in the top bar.",
-  "shell-version": ["50", "51"],
-  "url": "https://github.com/jasperblues/gnome-headroom"
+  "description": "AI plan limits (via the CodexBar CLI) and daily token usage (via ccusage) in the top bar.",
+  "shell-version": [
+    "50",
+    "51"
+  ],
+  "url": "https://github.com/jasperblues/gnome-headroom",
+  "settings-schema": "org.gnome.shell.extensions.headroom",
+  "version-name": "1.0"
 }

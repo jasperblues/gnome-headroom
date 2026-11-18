@@ -1,4 +1,5 @@
 // Headroom: AI plan limits (CodexBar CLI) + today's token burn (ccusage) in the GNOME top bar.
+// SPDX-License-Identifier: MIT
 import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
@@ -14,12 +15,22 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async');
 
 const HOME = GLib.get_home_dir();
-const CODEXBAR = `${HOME}/.local/bin/codexbar`;
-const PROVIDER = 'claude';
-// ccusage is usually an nvm-managed global, which GNOME Shell's PATH doesn't see.
-const CCUSAGE_ARGV = ['/bin/bash', '-c',
-    'command -v ccusage >/dev/null || . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; ' +
-    'exec ccusage daily --json --offline'];
+// GNOME Shell's PATH usually lacks user install dirs, so look in the common places too.
+const CODEXBAR_CANDIDATES = [
+    `${HOME}/.local/bin/codexbar`,
+    '/home/linuxbrew/.linuxbrew/bin/codexbar',
+    '/usr/local/bin/codexbar',
+    '/usr/bin/codexbar',
+];
+// ccusage is a Node CLI, typically installed under a version manager that only interactive shells load.
+const CCUSAGE_SCRIPT =
+    'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.volta/bin:$PATH"; ' +
+    'command -v ccusage >/dev/null || . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" >/dev/null 2>&1; ' +
+    'command -v ccusage >/dev/null || exit 127; ' +
+    'exec ccusage daily --json --offline';
+const NOT_FOUND = 127;
+
+const PROVIDER_NAMES = {claude: 'Claude', codex: 'Codex', gemini: 'Gemini', cursor: 'Cursor', copilot: 'Copilot', openai: 'OpenAI', zai: 'z.ai'};
 
 const LIMITS_EVERY_S = 300;
 const TOKENS_EVERY_S = 120;
@@ -27,13 +38,41 @@ const STALE_ON_OPEN_S = 60;
 const TRACK_PX = 292;
 const SPARKS = '▁▂▃▄▅▆▇█';
 
+class ToolMissing extends Error {}
+
 async function run(argv, cancellable) {
     const proc = Gio.Subprocess.new(argv,
         Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
     const [stdout] = await proc.communicate_utf8_async(null, cancellable);
+    if (proc.get_if_exited() && proc.get_exit_status() === NOT_FOUND)
+        throw new ToolMissing();
     if (!proc.get_successful())
-        throw new Error(`${argv[0]} exited with ${proc.get_exit_status()}`);
+        throw new Error(`${GLib.path_get_basename(argv[0])} exited with ${proc.get_exit_status()}`);
     return stdout;
+}
+
+function isExecutable(path) {
+    return path && GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE);
+}
+
+function findCodexbar(configured) {
+    if (configured)
+        return isExecutable(configured) ? configured : null;
+    return GLib.find_program_in_path('codexbar') ?? CODEXBAR_CANDIDATES.find(isExecutable) ?? null;
+}
+
+function ccusageArgv(configured) {
+    if (configured)
+        return isExecutable(configured) ? [configured, 'daily', '--json', '--offline'] : null;
+    return ['/bin/bash', '-c', CCUSAGE_SCRIPT];
+}
+
+function providerName(id) {
+    return PROVIDER_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+function isCancelled(e) {
+    return e instanceof GLib.Error && e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED);
 }
 
 function compact(n) {
@@ -101,6 +140,14 @@ function label(text, styleClass, props = {}) {
     return new St.Label({text, style_class: styleClass ?? '', ...props});
 }
 
+// Dim text that wraps instead of ellipsizing (status and error messages).
+function note(text) {
+    const l = label(text, 'headroom-dim headroom-note');
+    l.clutter_text.line_wrap = true;
+    l.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+    return l;
+}
+
 function row(left, right, leftClass, rightClass) {
     const box = new St.BoxLayout({x_expand: true});
     box.add_child(label(left, leftClass, {x_expand: true, y_align: Clutter.ActorAlign.CENTER}));
@@ -148,6 +195,7 @@ class Headroom extends PanelMenu.Button {
     _init(ext) {
         super._init(0.5, 'Headroom');
         this._ext = ext;
+        this._settings = ext.getSettings();
         this._cancellable = new Gio.Cancellable();
         this._limits = null;
         this._tokens = null;
@@ -179,6 +227,11 @@ class Headroom extends PanelMenu.Button {
                 this._refresh(false, STALE_ON_OPEN_S);
         });
 
+        this._settings.connectObject('changed', () => {
+            this._limits = this._tokens = null;
+            this._refresh(true);
+        }, this);
+
         this._render();
         this._refresh(true);
         this._limitsTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, LIMITS_EVERY_S, () => {
@@ -200,29 +253,42 @@ class Headroom extends PanelMenu.Button {
     }
 
     async _refreshLimits() {
+        const provider = this._settings.get_string('provider') || 'claude';
+        const codexbar = findCodexbar(this._settings.get_string('codexbar-path'));
         try {
-            const out = await run([CODEXBAR, 'usage', '--provider', PROVIDER, '--json'], this._cancellable);
-            const entry = JSON.parse(out).find(e => e.provider === PROVIDER) ?? null;
+            if (!codexbar)
+                throw new ToolMissing();
+            const out = await run([codexbar, 'usage', '--provider', provider, '--json'], this._cancellable);
+            const entry = JSON.parse(out).find(e => e.provider === provider) ?? null;
             this._limits = entry;
-            this._limitsError = entry ? null : `No ${PROVIDER} data`;
+            this._limitsError = entry ? null : `No ${providerName(provider)} data from CodexBar`;
         } catch (e) {
-            if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+            if (isCancelled(e))
                 return;
-            this._limitsError = e.message;
+            this._limits = null;
+            this._limitsError = e instanceof ToolMissing
+                ? 'CodexBar CLI not found. Install it to see plan limits.'
+                : e.message;
         }
         this._limitsAt = Date.now() / 1000;
         this._render();
     }
 
     async _refreshTokens() {
+        const argv = ccusageArgv(this._settings.get_string('ccusage-path'));
         try {
-            const out = await run(CCUSAGE_ARGV, this._cancellable);
+            if (!argv)
+                throw new ToolMissing();
+            const out = await run(argv, this._cancellable);
             this._tokens = JSON.parse(out).daily ?? [];
             this._tokensError = null;
         } catch (e) {
-            if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+            if (isCancelled(e))
                 return;
-            this._tokensError = e.message;
+            this._tokens = null;
+            this._tokensError = e instanceof ToolMissing
+                ? 'ccusage not found. Install it with npm i -g ccusage to see token counts.'
+                : e.message;
         }
         this._tokensAt = Date.now() / 1000;
         this._render();
@@ -278,11 +344,11 @@ class Headroom extends PanelMenu.Button {
         if (!this._limits) {
             this._limitsCard.reset(
                 label('Plan limits', 'headroom-heading'),
-                label(this._limitsError ?? 'Loading…', 'headroom-dim'));
+                note(this._limitsError ?? 'Loading…'));
             return;
         }
         const u = this._limits.usage;
-        const children = [row('Claude', u.loginMethod ?? '', 'headroom-heading', 'headroom-dim')];
+        const children = [row(providerName(this._limits.provider), u.loginMethod ?? '', 'headroom-heading', 'headroom-dim')];
         for (const w of this._windows()) {
             const used = w.window.usedPercent ?? 0;
             children.push(row(w.title, `${100 - Math.round(used)}% left`));
@@ -293,7 +359,7 @@ class Headroom extends PanelMenu.Button {
                 children.push(label(detail, 'headroom-dim'));
         }
         if (this._limitsError)
-            children.push(label(`⚠ ${this._limitsError}`, 'headroom-dim'));
+            children.push(note(`⚠ ${this._limitsError}`));
         this._limitsCard.reset(...children);
     }
 
@@ -301,7 +367,7 @@ class Headroom extends PanelMenu.Button {
         if (!this._tokens) {
             this._tokensCard.reset(
                 label('Today', 'headroom-heading'),
-                label(this._tokensError ?? 'Loading…', 'headroom-dim'));
+                note(this._tokensError ?? 'Loading…'));
             return;
         }
         const days = this._tokens;
@@ -351,7 +417,7 @@ class Headroom extends PanelMenu.Button {
         children.push(sparkRow);
         children.push(row(`${compact(weekTotal)} this week`, `avg ${compact(weekTotal / 7)}/day`, 'headroom-dim', 'headroom-dim'));
 
-        // Personal best (excluding today), for the tokenmaxers.
+        // Personal best (excluding today). Purely for entertainment; see README.
         const past = days.filter(d => d.period !== today?.period);
         const best = past.reduce((a, d) => (!a || d.totalTokens > a.totalTokens ? d : a), null);
         if (best) {
@@ -364,12 +430,14 @@ class Headroom extends PanelMenu.Button {
             }
         }
         if (this._tokensError)
-            children.push(label(`⚠ ${this._tokensError}`, 'headroom-dim'));
+            children.push(note(`⚠ ${this._tokensError}`));
         this._tokensCard.reset(...children);
     }
 
     destroy() {
         this._cancellable.cancel();
+        this._settings.disconnectObject(this);
+        this._settings = null;
         for (const id of [this._limitsTimer, this._tokensTimer]) {
             if (id)
                 GLib.source_remove(id);

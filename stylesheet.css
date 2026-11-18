@@ -64,3 +64,7 @@
   padding: 0;
   margin: 0;
 }
+
+.headroom-note {
+  max-width: 300px;
+}

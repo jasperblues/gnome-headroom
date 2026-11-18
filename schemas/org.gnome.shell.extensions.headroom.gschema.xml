@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.headroom" path="/org/gnome/shell/extensions/headroom/">
+    <key name="provider" type="s">
+      <default>'claude'</default>
+      <summary>CodexBar provider</summary>
+      <description>Which CodexBar provider's plan limits to show, e.g. claude, codex, gemini, cursor. See `codexbar usage --help` for the full list.</description>
+    </key>
+    <key name="codexbar-path" type="s">
+      <default>''</default>
+      <summary>Path to the codexbar CLI</summary>
+      <description>Leave empty to search PATH and the usual install locations.</description>
+    </key>
+    <key name="ccusage-path" type="s">
+      <default>''</default>
+      <summary>Path to ccusage</summary>
+      <description>Leave empty to search PATH, ~/.local/bin, bun, volta and nvm.</description>
+    </key>
+  </schema>
+</schemalist>

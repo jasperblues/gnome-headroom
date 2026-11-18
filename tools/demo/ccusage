@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""Fake `ccusage daily --json` output for screenshots (tools/nested-shot.sh --demo)."""
+import datetime, json
+today = datetime.date.today()
+# Oldest first; last entry is today.
+totals = [310e6, 520e6, 180e6, 740e6, 905e6, 640e6, 420e6, 1.02e9, 860e6, 0, 690e6, 1.21e9, 380e6, 615e6]
+days = []
+for i, total in enumerate(totals):
+    if not total:
+        continue
+    date = today - datetime.timedelta(days=len(totals) - 1 - i)
+    models = [("claude-opus-5-5", 0.78, 2.4e-7), ("claude-sonnet-5-5", 0.21, 1.5e-7), ("claude-haiku-5-5", 0.01, 4e-8)]
+    breakdowns = []
+    for name, share, rate in models:
+        t = total * share
+        breakdowns.append({"modelName": name, "inputTokens": int(t * 0.00001), "outputTokens": int(t * 0.002),
+                           "cacheReadTokens": int(t * 0.988), "cacheCreationTokens": int(t * 0.00999), "cost": t * rate})
+    days.append({
+        "period": date.isoformat(), "totalTokens": int(total),
+        "inputTokens": sum(b["inputTokens"] for b in breakdowns), "outputTokens": sum(b["outputTokens"] for b in breakdowns),
+        "cacheReadTokens": sum(b["cacheReadTokens"] for b in breakdowns), "cacheCreationTokens": sum(b["cacheCreationTokens"] for b in breakdowns),
+        "totalCost": sum(b["cost"] for b in breakdowns), "modelBreakdowns": breakdowns,
+    })
+print(json.dumps({"daily": days}))
