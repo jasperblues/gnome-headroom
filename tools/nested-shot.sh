@@ -47,8 +47,9 @@ cat > "$tmp/inner.sh" <<INNER
 #!/bin/bash
 dconf write /org/gnome/shell/enabled-extensions "[$uuids]"
 dconf write /org/gnome/desktop/interface/color-scheme "'prefer-dark'"
+dconf write /org/gnome/shell/welcome-dialog-last-shown-version "'999'"
 $settings
-timeout 22 gnome-shell --headless --virtual-monitor 1440x900 --wayland --no-x11 > "$out/shell.log" 2>&1
+timeout 30 gnome-shell --headless --virtual-monitor 1440x900 --wayland --no-x11 > "$out/shell.log" 2>&1
 true
 INNER
 chmod +x "$tmp/inner.sh"

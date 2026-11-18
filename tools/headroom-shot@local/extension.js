@@ -19,9 +19,9 @@ export default class extends Extension {
     enable() {
         (async () => {
             try {
-                await wait(12000);
+                await wait(9000);
                 Main.overview.hide();
-                await wait(800);
+                await wait(2500);
                 const tb = Main.panel.statusArea['headroom@jasperblues.github.io'];
                 console.log(`HRSHOT indicator=${!!tb}`);
                 await shot('panel');
