@@ -4,6 +4,7 @@ import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
+import Pango from 'gi://Pango';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -110,9 +111,16 @@ function bar(usedPercent) {
 const Card = GObject.registerClass(
 class Card extends PopupMenu.PopupBaseMenuItem {
     _init() {
-        super._init({reactive: false, can_focus: false});
+        // Stay reactive so St doesn't apply :insensitive (dimmed) styling, but never hover or activate.
+        super._init({reactive: true, activate: false, hover: false, can_focus: false});
         this.box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'token-bar-card', x_expand: true});
         this.add_child(this.box);
+    }
+
+    syncSensitive() {
+        this.reactive = true;
+        this.can_focus = false;
+        return true;
     }
 
     reset(...children) {
@@ -217,7 +225,7 @@ class TokenBar extends PanelMenu.Button {
         const out = [];
         for (const [key, fallback] of [['primary', 'Session'], ['secondary', 'Weekly'], ['tertiary', 'Monthly']]) {
             if (u[key])
-                out.push({title: names[key] ?? fallback, window: u[key], pace: pace[key]?.summary});
+                out.push({title: names[key] ?? fallback, window: u[key], pace: pace[key]?.summary?.split('|')[0].trim()});
         }
         for (const extra of u.extraRateWindows ?? [])
             out.push({title: extra.title, window: extra.window, pace: null});
@@ -313,7 +321,9 @@ class TokenBar extends PanelMenu.Button {
         const weekTotal = week.reduce((a, b) => a + b, 0);
         const sparkRow = new St.BoxLayout({x_expand: true});
         sparkRow.add_child(label('Last 7 days', 'token-bar-dim', {x_expand: true, y_align: Clutter.ActorAlign.CENTER}));
-        sparkRow.add_child(label(spark, 'token-bar-spark'));
+        const sparkLabel = label(spark, 'token-bar-spark', {y_align: Clutter.ActorAlign.CENTER});
+        sparkLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        sparkRow.add_child(sparkLabel);
         children.push(sparkRow);
         children.push(row(`${compact(weekTotal)} this week`, `avg ${compact(weekTotal / 7)}/day`, 'token-bar-dim', 'token-bar-dim'));
 
